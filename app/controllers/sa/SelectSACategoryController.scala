@@ -17,18 +17,19 @@
 package controllers.sa
 
 import javax.inject.Inject
+
 import config.FrontendAppConfig
 import controllers.actions._
 import play.api.data.Form
 import play.api.i18n.{I18nSupport, MessagesApi}
 import uk.gov.hmrc.play.bootstrap.controller.FrontendController
 import utils.{Enumerable, HmrcEnrolmentType, Navigator, RadioOption}
-import forms.sa.SelectSACategoryFormProvider
+import forms.sa.{SelectSACategoryFormProvider, YourSaIsNotInThisAccountFormProvider}
 import identifiers.SelectSACategoryId
 import models.sa.{DoYouHaveSAUTR, SelectSACategory}
 import play.api.mvc.Call
 import uk.gov.hmrc.auth.core.Enrolments
-import views.html.sa.selectSACategory
+import views.html.sa.{selectSACategory, yourSaIsNotInThisAccount}
 import utils.&&
 import controllers.sa.partnership.routes.DoYouWantToAddPartnerController
 import models.requests.ServiceInfoRequest
@@ -40,21 +41,27 @@ class SelectSACategoryController @Inject()(
   navigator: Navigator[Call],
   authenticate: AuthAction,
   serviceInfoData: ServiceInfoAction,
-  formProvider: SelectSACategoryFormProvider)
+  formProvider: SelectSACategoryFormProvider,
+  notInAccountFormProvider: YourSaIsNotInThisAccountFormProvider)
     extends FrontendController
     with I18nSupport
     with Enumerable.Implicits {
 
   val form = formProvider()
+  val notInAccountForm = notInAccountFormProvider()
 
   def onPageLoadHasUTR = onPageLoad(routes.SelectSACategoryController.onSubmitHasUTR())
   def onPageLoadNoUTR = onPageLoad(routes.SelectSACategoryController.onSubmitNoUTR())
 
   private def onPageLoad(action: Call) = (authenticate andThen serviceInfoData) { implicit request =>
     redirectWhenHasSAAndRT {
-      Ok(
+      val view = if (request.session.get("usedBtaBefore").exists(_.equals("true"))) {
+        yourSaIsNotInThisAccount(appConfig, notInAccountForm)(request.serviceInfoContent)
+      } else {
         selectSACategory(appConfig, form, action, getRadioOptions(request.request.enrolments))(
-          request.serviceInfoContent))
+          request.serviceInfoContent)
+      }
+      Ok(view)
     }
   }
 

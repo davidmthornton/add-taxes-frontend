@@ -18,14 +18,14 @@ package controllers.sa
 
 import controllers._
 import controllers.actions.{FakeServiceInfoAction, _}
-import forms.sa.SelectSACategoryFormProvider
-import models.sa.SelectSACategory
+import forms.sa.{SelectSACategoryFormProvider, YourSaIsNotInThisAccountFormProvider}
+import models.sa.{SelectSACategory, YourSaIsNotInThisAccount}
 import play.api.data.Form
-import play.api.mvc.Call
+import play.api.mvc.{Call, Cookie}
 import play.api.test.Helpers._
 import play.twirl.api.HtmlFormat
 import utils.{FakeNavigator, HmrcEnrolmentType, RadioOption}
-import views.html.sa.selectSACategory
+import views.html.sa.{selectSACategory, yourSaIsNotInThisAccount}
 
 class SelectSACategoryControllerSpec extends ControllerSpecBase {
 
@@ -34,6 +34,9 @@ class SelectSACategoryControllerSpec extends ControllerSpecBase {
   val formProvider = new SelectSACategoryFormProvider()
   val form = formProvider()
 
+  val notInThisAccountFormProvider = new YourSaIsNotInThisAccountFormProvider()
+  val notInThisAccountForm = notInThisAccountFormProvider()
+
   def controller()(enrolmentTypes: HmrcEnrolmentType*) =
     new SelectSACategoryController(
       frontendAppConfig,
@@ -41,7 +44,8 @@ class SelectSACategoryControllerSpec extends ControllerSpecBase {
       new FakeNavigator[Call](desiredRoute = onwardRoute),
       FakeAuthAction,
       FakeServiceInfoAction(enrolmentTypes: _*),
-      formProvider
+      formProvider,
+      notInThisAccountFormProvider
     )
 
   def viewAsString(form: Form[_] = form, radioOptions: Set[RadioOption] = SelectSACategory.options) =
@@ -60,6 +64,14 @@ class SelectSACategoryControllerSpec extends ControllerSpecBase {
       radioOptions
     )(HtmlFormat.empty)(fakeRequest, messages).toString
 
+  def viewNotInThisAccountAsString(
+    form: Form[_] = form,
+    radioOptions: Set[RadioOption] = YourSaIsNotInThisAccount.options) =
+    yourSaIsNotInThisAccount(
+      frontendAppConfig,
+      form
+    )(HtmlFormat.empty)(fakeRequest, messages).toString
+
   "SelectSACategory Controller" must {
 
     "return OK and the correct view for a GET" in {
@@ -74,6 +86,13 @@ class SelectSACategoryControllerSpec extends ControllerSpecBase {
 
       status(result) mustBe OK
       contentAsString(result) mustBe viewAsStringNoUTR()
+    }
+
+    "return OK and the correct view for a GET when called with a usedBtaBefore flag in the session cookie" in {
+      val result = controller()().onPageLoadHasUTR()(fakeRequest.withSession(("usedBtaBefore", "true")))
+
+      status(result) mustBe OK
+      contentAsString(result) mustBe viewNotInThisAccountAsString()
     }
 
     "redirect to the next page when valid data is submitted" in {
